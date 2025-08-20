@@ -182,6 +182,7 @@ export default function LoginPage() {
   const [pastUsers, setPastUsers] = useState<UserType[]>([])
   const [userViewTab, setUserViewTab] = useState("current")
   const [showAddUser, setShowAddUser] = useState(false)
+  const [showAddAssetForm, setShowAddAssetForm] = useState(false)
 
   const handleRemoveUser = (userId: number) => {
     // Logic to remove user
@@ -190,11 +191,144 @@ export default function LoginPage() {
     localStorage.setItem("werkUsers", JSON.stringify(updatedUsers))
   }
 
+  // Fetch users from API
+  const fetchUsers = async () => {
+    try {
+      const response = await fetch('/api/users')
+      if (response.ok) {
+        const usersData = await response.json()
+        setUsers(usersData)
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error)
+    }
+  }
+
+  // Fetch assets from API
+  const fetchAssets = async () => {
+    try {
+      const response = await fetch('/api/assets')
+      if (response.ok) {
+        const assetsData = await response.json()
+        setAssets(assetsData)
+      }
+    } catch (error) {
+      console.error('Error fetching assets:', error)
+    }
+  }
+
+  // Add new asset via API
+  const handleAddAsset = async (assetData: {
+    name: string
+    category: string
+    serialNumber: string
+  }) => {
+    try {
+      const response = await fetch('/api/assets', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(assetData),
+      })
+
+      if (response.ok) {
+        await fetchAssets() // Refresh the assets list
+        return true
+      } else {
+        const error = await response.json()
+        console.error('Error adding asset:', error)
+        return false
+      }
+    } catch (error) {
+      console.error('Error adding asset:', error)
+      return false
+    }
+  }
+
+  // Delete asset via API
+  const handleDeleteAsset = async (assetId: number) => {
+    try {
+      const response = await fetch(`/api/assets/${assetId}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        await fetchAssets() // Refresh the assets list
+        return true
+      } else {
+        const error = await response.json()
+        console.error('Error deleting asset:', error)
+        return false
+      }
+    } catch (error) {
+      console.error('Error deleting asset:', error)
+      return false
+    }
+  }
+
+  // Assign asset to user via API
+  const handleAssignAssetAPI = async (assetId: number, userId: number, notes?: string) => {
+    try {
+      const response = await fetch('/api/assets/assignments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          assetId,
+          userId,
+          assignedBy: user?.name || 'System',
+          notes
+        }),
+      })
+
+      if (response.ok) {
+        await fetchAssets() // Refresh the assets list
+        return true
+      } else {
+        const error = await response.json()
+        console.error('Error assigning asset:', error)
+        return false
+      }
+    } catch (error) {
+      console.error('Error assigning asset:', error)
+      return false
+    }
+  }
+
+  // Return asset via API
+  const handleReturnAssetAPI = async (assetId: number, returnCondition?: string, notes?: string) => {
+    try {
+      const response = await fetch('/api/assets/assignments', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          assetId,
+          returnCondition,
+          notes
+        }),
+      })
+
+      if (response.ok) {
+        await fetchAssets() // Refresh the assets list
+        return true
+      } else {
+        const error = await response.json()
+        console.error('Error returning asset:', error)
+        return false
+      }
+    } catch (error) {
+      console.error('Error returning asset:', error)
+      return false
+    }
+  }
+
   useEffect(() => {
     // Check if user is already logged in
     const savedUser = localStorage.getItem("werkUser")
-    const savedUsers = localStorage.getItem("werkUsers")
-    const savedAssets = localStorage.getItem("werkAssets")
     const savedPastUsers = localStorage.getItem("werkPastUsers")
 
     if (savedUser) {
@@ -202,17 +336,9 @@ export default function LoginPage() {
       setIsLoggedIn(true)
     }
 
-    if (savedUsers) {
-      try {
-        const parsedUsers = JSON.parse(savedUsers)
-        if (Array.isArray(parsedUsers)) {
-          setUsers(parsedUsers)
-        }
-      } catch (error) {
-        console.error("Error parsing saved users:", error)
-        // Keep INITIAL_USERS if parsing fails
-      }
-    }
+    // Load data from API instead of localStorage
+    fetchUsers()
+    fetchAssets()
 
     if (savedPastUsers) {
       try {
@@ -224,36 +350,37 @@ export default function LoginPage() {
         console.error("Error parsing saved past users:", error)
       }
     }
-
-    if (savedAssets) {
-      try {
-        const parsedAssets = JSON.parse(savedAssets)
-        if (Array.isArray(parsedAssets)) {
-          setAssets(parsedAssets)
-        }
-      } catch (error) {
-        console.error("Error parsing saved assets:", error)
-      }
-    }
   }, [])
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError("")
 
-    // Simulate API call delay
-    setTimeout(() => {
-      const foundUser = users.find((u) => u.username === username && u.password === password)
-      if (foundUser) {
-        setUser(foundUser)
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username, password }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setUser(data.user)
         setIsLoggedIn(true)
-        localStorage.setItem("werkUser", JSON.stringify(foundUser))
+        localStorage.setItem("werkUser", JSON.stringify(data.user))
       } else {
-        setError("Invalid credentials")
+        setError(data.error || "Invalid credentials")
       }
+    } catch (error) {
+      console.error('Login error:', error)
+      setError("Network error. Please try again.")
+    } finally {
       setIsLoading(false)
-    }, 1000)
+    }
   }
 
   const handleLogout = () => {
@@ -402,7 +529,7 @@ ${450 + pdfContent.length}
     return password
   }
 
-  const handleAddUser = (userData: {
+  const handleAddUser = async (userData: {
     name: string
     email: string
     idNumber: string
@@ -414,65 +541,71 @@ ${450 + pdfContent.length}
       return
     }
 
-    const initials = userData.name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
+    try {
+      const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: userData.name,
+          email: userData.email,
+          idNumber: userData.idNumber,
+          role: userData.role,
+          mobileNumber: userData.mobileNumber,
+        }),
+      })
 
-    let username = `${initials}.assets@werk`
-    let counter = 1
+      const result = await response.json()
 
-    // Check if username already exists and add number if needed
-    while (users.some((user) => user.username === username)) {
-      username = `${initials}${counter}.assets@werk`
-      counter++
+      if (response.ok) {
+        // Refresh users list
+        await fetchUsers()
+
+        // Generate user credentials receipt
+        generateUserCredentialsReceipt(result.user, result.credentials.password)
+
+        setShowAddUser(false)
+        alert(`User created successfully! Username: ${result.credentials.username}`)
+      } else {
+        alert(`Error: ${result.error}`)
+      }
+    } catch (error) {
+      console.error('Error creating user:', error)
+      alert("Network error. Please try again.")
     }
-
-    // Generate secure password
-    const password = generateSecurePassword()
-
-    const newUser: UserType = {
-      id: Date.now(),
-      username,
-      password,
-      name: userData.name,
-      email: userData.email,
-      idNumber: userData.idNumber,
-      role: userData.role,
-      mobileNumber: userData.mobileNumber,
-      createdDate: new Date().toISOString(),
-    }
-
-    const updatedUsers = [...users, newUser]
-    setUsers(updatedUsers)
-    localStorage.setItem("werkUsers", JSON.stringify(updatedUsers))
-
-    // Generate user credentials receipt
-    generateUserCredentialsReceipt(newUser, password)
-
-    setShowAddUser(false)
-    alert(`User created successfully! Username: ${username}`)
   }
 
-  const handleResetPassword = (userId: number) => {
-    const newPassword = generateSecurePassword()
-    const updatedUsers = users.map((user) => {
-      if (user.id === userId) {
-        return { ...user, password: newPassword }
+  const handleResetPassword = async (userId: number) => {
+    try {
+      const response = await fetch('/api/users', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId }),
+      })
+
+      const result = await response.json()
+
+      if (response.ok) {
+        // Refresh users list
+        await fetchUsers()
+
+        // Find the user and generate new credentials receipt
+        const user = users.find((u) => u.id === userId)
+        if (user) {
+          generateUserCredentialsReceipt(user, result.newPassword)
+        }
+
+        alert(`Password reset successfully! New password: ${result.newPassword}`)
+      } else {
+        alert(`Error: ${result.error}`)
       }
-      return user
-    })
-    setUsers(updatedUsers)
-    localStorage.setItem("werkUsers", JSON.stringify(updatedUsers))
-
-    // Find the user and generate new credentials receipt
-    const user = updatedUsers.find((u) => u.id === userId)
-    if (user) {
-      generateUserCredentialsReceipt(user, newPassword)
+    } catch (error) {
+      console.error('Error resetting password:', error)
+      alert("Network error. Please try again.")
     }
-
-    alert(`Password reset successfully! New password: ${newPassword}`)
   }
 
   const generateUserCredentialsReceipt = (user: any, generatedPassword: string) => {
@@ -620,6 +753,8 @@ startxref
         setUserViewTab={setUserViewTab}
         showAddUser={showAddUser}
         setShowAddUser={setShowAddUser}
+        showAddAssetForm={showAddAssetForm}
+        setShowAddAssetForm={setShowAddAssetForm}
         generateUserListPDF={generateUserListPDF}
         handleAddUser={handleAddUser}
         generatePDFContent={generatePDFContent}
@@ -713,6 +848,8 @@ function Dashboard({
   setUserViewTab,
   showAddUser,
   setShowAddUser,
+  showAddAssetForm,
+  setShowAddAssetForm,
   generateUserListPDF,
   handleAddUser,
   generatePDFContent,
@@ -733,6 +870,8 @@ function Dashboard({
   setUserViewTab: (tab: string) => void
   showAddUser: boolean
   setShowAddUser: (show: boolean) => void
+  showAddAssetForm: boolean
+  setShowAddAssetForm: (show: boolean) => void
   generateUserListPDF: (userList: UserType[], listType: "current" | "past") => void
   handleAddUser: (userData: {
     name: string
@@ -859,8 +998,8 @@ function Dashboard({
             setAssets={setAssets}
             documents={documents}
             setDocuments={setDocuments}
-            showAddAsset={showAddUser}
-            setShowAddAsset={setShowAddUser}
+            showAddAsset={showAddAssetForm}
+            setShowAddAsset={setShowAddAssetForm}
             requests={requests}
             setRequests={setRequests}
             pastUsers={pastUsers}
@@ -869,6 +1008,7 @@ function Dashboard({
             setUserViewTab={setUserViewTab}
             generateUserListPDF={generateUserListPDF}
             handleRemoveUser={handleRemoveUser}
+            showAddUser={showAddUser}
             setShowAddUser={setShowAddUser}
             handleAddUser={handleAddUser}
             generatePDFContent={generatePDFContent}
@@ -902,6 +1042,7 @@ function DashboardContent({
   setUserViewTab,
   generateUserListPDF,
   handleRemoveUser,
+  showAddUser,
   setShowAddUser,
   handleAddUser,
   generatePDFContent,
@@ -924,6 +1065,7 @@ function DashboardContent({
   setUserViewTab: (tab: string) => void
   generateUserListPDF: (userList: UserType[], listType: "current" | "past") => void
   handleRemoveUser: (userId: number) => void
+  showAddUser: boolean
   setShowAddUser: (show: boolean) => void
   handleAddUser: (userData: {
     name: string
@@ -1688,7 +1830,7 @@ System developed by Don Kelvin | 0759954921`
         </div>
       )}
 
-      {showAddAsset && (
+      {showAddUser && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <h2 className="text-xl font-bold mb-4">Add New User</h2>
@@ -2175,10 +2317,94 @@ System developed by Don Kelvin | 0759954921`
 
       {activeTab === "assets" && (
         <div className="space-y-6">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Asset Management</h1>
-            <p className="text-gray-600">Manage assets and their assignments</p>
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Asset Management</h1>
+              <p className="text-gray-600">Manage assets and their assignments</p>
+            </div>
+            <Button
+              onClick={() => setShowAddAsset(!showAddAsset)}
+              className="bg-[#a4d72d] hover:bg-[#8fb825] text-white"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Asset
+            </Button>
           </div>
+
+          {showAddAsset && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Add New Asset</CardTitle>
+                <CardDescription>Fill in the asset details to add it to the system</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={async (e) => {
+                  e.preventDefault()
+                  const formData = new FormData(e.currentTarget)
+                  const assetData = {
+                    name: formData.get('name') as string,
+                    category: formData.get('category') as string,
+                    serialNumber: formData.get('serialNumber') as string,
+                  }
+                  
+                  if (assetData.name && assetData.category && assetData.serialNumber) {
+                    const success = await handleAddAsset(assetData)
+                    if (success) {
+                      setShowAddAsset(false)
+                      ;(e.target as HTMLFormElement).reset()
+                    }
+                  }
+                }} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Asset Name</label>
+                      <Input 
+                        name="name"
+                        placeholder="e.g., MacBook Pro 16&quot;"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                      <select 
+                        name="category"
+                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#a4d72d] focus:border-transparent"
+                        required
+                      >
+                        <option value="">Select Category</option>
+                        {CATEGORIES.map((category) => (
+                          <option key={category} value={category}>{category}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Serial Number</label>
+                      <Input 
+                        name="serialNumber"
+                        placeholder="e.g., MBP2024001"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button 
+                      type="submit"
+                      className="bg-[#a4d72d] hover:bg-[#8fb825] text-white"
+                    >
+                      Add Asset
+                    </Button>
+                    <Button 
+                      type="button"
+                      variant="outline"
+                      onClick={() => setShowAddAsset(false)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          )}
 
           <div className="grid gap-4">
             {assets.map((asset) => (
@@ -2189,7 +2415,19 @@ System developed by Don Kelvin | 0759954921`
                       <CardTitle>{asset.name}</CardTitle>
                       <CardDescription>{asset.category}</CardDescription>
                     </div>
-                    <Badge variant={asset.status === "available" ? "default" : "secondary"}>{asset.status}</Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={asset.status === "available" ? "default" : "secondary"}>{asset.status}</Badge>
+                      {asset.status === "available" && user?.role === "admin" && (
+                        <Button
+                          onClick={() => handleDeleteAsset(asset.id)}
+                          variant="outline"
+                          size="sm"
+                          className="text-red-600 hover:text-red-700 hover:border-red-300"
+                        >
+                          Delete
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -2229,18 +2467,47 @@ System developed by Don Kelvin | 0759954921`
                         <option value="Needs Repair">Needs Repair</option>
                       </select>
                       <Button
-                        onClick={() => {
+                        onClick={async () => {
                           const conditionSelect = document.getElementById(
                             `return-condition-${asset.id}`,
                           ) as HTMLSelectElement
                           const condition = conditionSelect?.value || "Good"
-                          handleReturnAsset(asset.id, condition)
+                          await handleReturnAssetAPI(asset.id, condition)
                         }}
                         variant="outline"
                         size="sm"
                         className="w-full"
                       >
                         Process Return
+                      </Button>
+                    </div>
+                  )}
+                  {asset.status === "available" && user?.role !== "staff" && (
+                    <div className="mt-4 space-y-2">
+                      <label className="text-sm font-medium">Assign to User:</label>
+                      <select
+                        className="w-full p-2 border rounded-md"
+                        id={`assign-user-${asset.id}`}
+                      >
+                        <option value="">Select User</option>
+                        {users.filter(u => u.role !== "admin").map((user) => (
+                          <option key={user.id} value={user.id}>{user.name}</option>
+                        ))}
+                      </select>
+                      <Button
+                        onClick={async () => {
+                          const userSelect = document.getElementById(
+                            `assign-user-${asset.id}`,
+                          ) as HTMLSelectElement
+                          const userId = parseInt(userSelect?.value || "0")
+                          if (userId > 0) {
+                            await handleAssignAssetAPI(asset.id, userId)
+                          }
+                        }}
+                        className="w-full bg-[#a4d72d] hover:bg-[#8fb825] text-white"
+                        size="sm"
+                      >
+                        Assign Asset
                       </Button>
                     </div>
                   )}
