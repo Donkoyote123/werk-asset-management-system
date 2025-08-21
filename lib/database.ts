@@ -9,13 +9,21 @@ export async function initializeDatabase() {
       return false
     }
 
-    // Test the connection
-    await sql`SELECT 1`
+    console.log('Attempting database connection...')
+    console.log('POSTGRES_URL exists:', !!process.env.POSTGRES_URL)
     
-    console.log('Database connection successful')
+    // Test the connection with a simple query
+    const result = await sql`SELECT NOW() as current_time`
+    
+    console.log('Database connection successful:', result.rows[0])
     return true
   } catch (error) {
     console.error('Database connection failed:', error)
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      detail: error.detail
+    })
     return false
   }
 }
