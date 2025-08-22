@@ -8,7 +8,7 @@ const INITIAL_ASSETS: Asset[] = [
     name: 'MacBook Pro 16"',
     category: 'Laptops',
     serialNumber: 'MBP2023001',
-    tagNumber: 'WERK-LT-001',
+    tagNumber: 'MBP2023001', // Use serialNumber as tagNumber
     status: 'available',
     purchaseDate: '2024-01-15',
     purchaseCost: 2500.00,
@@ -20,7 +20,7 @@ const INITIAL_ASSETS: Asset[] = [
     name: 'iPhone 15 Pro',
     category: 'Mobile Device',
     serialNumber: 'IP15P001',
-    tagNumber: 'WERK-MB-001',
+    tagNumber: 'IP15P001', // Use serialNumber as tagNumber
     status: 'available',
     purchaseDate: '2024-02-01',
     purchaseCost: 1200.00,
@@ -32,7 +32,7 @@ const INITIAL_ASSETS: Asset[] = [
     name: 'Dell Monitor 27"',
     category: 'Monitor',
     serialNumber: 'DM27001',
-    tagNumber: 'WERK-MN-001',
+    tagNumber: 'DM27001', // Use serialNumber as tagNumber
     status: 'available',
     purchaseDate: '2024-01-20',
     purchaseCost: 450.00,
@@ -69,25 +69,6 @@ interface NewAssetData {
   description?: string
 }
 
-// Utility function to generate tag numbers
-function generateTagNumber(category: string): string {
-  const categoryPrefix: Record<string, string> = {
-    'Laptops': 'LT',
-    'Mobile Device': 'MB', 
-    'Monitor': 'MN',
-    'Peripherals': 'PR',
-    'Network Equipment': 'NT',
-    'Office Equipment': 'OF',
-    'Furniture': 'FR',
-    'Software': 'SW'
-  }
-
-  const prefix = categoryPrefix[category] || 'AS'
-  const random = Math.floor(Math.random() * 9999).toString().padStart(3, '0')
-  
-  return `WERK-${prefix}-${random}`
-}
-
 // GET - Fetch all assets
 export async function GET() {
   try {
@@ -112,13 +93,13 @@ export async function GET() {
         name: asset.name,
         category: asset.category,
         serialNumber: asset.serial_number,
-        tagNumber: asset.tag_number,
+        tagNumber: asset.serial_number, // Use serial_number as tag_number since tag_number doesn't exist in DB
         status: asset.status,
         assignedTo: asset.assigned_to,
         assignedDate: asset.assigned_date,
-        returnDate: asset.return_date,
+        returnDate: null, // Database doesn't have return_date column
         purchaseDate: asset.purchase_date,
-        purchaseCost: asset.purchase_cost,
+        purchaseCost: asset.purchase_price, // Map purchase_price to purchaseCost
         description: asset.description,
         createdDate: asset.created_date,
       }))
@@ -166,21 +147,6 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // Generate unique tag number
-      let tagNumber = generateTagNumber(assetData.category)
-      let attempts = 0
-      while (attempts < 10) {
-        const { data: tagExists, error: tagError } = await supabase
-          .from('assets')
-          .select('id')
-          .eq('tag_number', tagNumber)
-          .single()
-
-        if (!tagExists || tagError) break
-        tagNumber = generateTagNumber(assetData.category)
-        attempts++
-      }
-
       // Insert new asset
       const { data: newAsset, error: insertError } = await supabase
         .from('assets')
@@ -188,10 +154,9 @@ export async function POST(request: NextRequest) {
           name: assetData.name,
           category: assetData.category,
           serial_number: assetData.serialNumber,
-          tag_number: tagNumber,
           status: 'available',
           purchase_date: assetData.purchaseDate || null,
-          purchase_cost: assetData.purchaseCost || null,
+          purchase_price: assetData.purchaseCost || null,  // Map purchaseCost to purchase_price
           description: assetData.description || null
         })
         .select()
@@ -212,10 +177,10 @@ export async function POST(request: NextRequest) {
           name: newAsset.name,
           category: newAsset.category,
           serialNumber: newAsset.serial_number,
-          tagNumber: newAsset.tag_number,
+          tagNumber: newAsset.serial_number, // Use serial_number as tag_number
           status: newAsset.status,
           purchaseDate: newAsset.purchase_date,
-          purchaseCost: newAsset.purchase_cost,
+          purchaseCost: newAsset.purchase_price, // Map back to purchaseCost
           description: newAsset.description,
           createdDate: newAsset.created_date,
         }
@@ -230,19 +195,13 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // Generate unique tag number
-      let tagNumber = generateTagNumber(assetData.category)
-      while (memoryAssets.some(asset => asset.tagNumber === tagNumber)) {
-        tagNumber = generateTagNumber(assetData.category)
-      }
-
       // Create new asset
       const newAsset: Asset = {
         id: Date.now(),
         name: assetData.name,
         category: assetData.category,
         serialNumber: assetData.serialNumber,
-        tagNumber: tagNumber,
+        tagNumber: assetData.serialNumber, // Use serialNumber as tagNumber
         status: 'available',
         purchaseDate: assetData.purchaseDate,
         purchaseCost: assetData.purchaseCost,
