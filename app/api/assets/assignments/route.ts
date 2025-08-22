@@ -52,9 +52,9 @@ export async function POST(request: NextRequest) {
           asset_id: assetId,
           user_id: userId,
           assigned_by: assignedBy,
-          date_assigned: new Date().toISOString().split('T')[0],
+          assigned_date: new Date().toISOString(),
           notes: notes || null,
-          is_active: true
+          status: 'active'
         })
 
       if (assignmentError) {
@@ -70,8 +70,8 @@ export async function POST(request: NextRequest) {
         .from('assets')
         .update({ 
           status: 'assigned',
-          assigned_to: user.name,
-          assigned_date: new Date().toISOString().split('T')[0]
+          assigned_to: userId,  // Use user ID instead of name
+          assigned_date: new Date().toISOString()
         })
         .eq('id', assetId)
 
@@ -151,13 +151,12 @@ export async function PUT(request: NextRequest) {
       const { error: assignmentError } = await supabase
         .from('asset_assignments')
         .update({
-          date_returned: new Date().toISOString().split('T')[0],
-          return_condition: returnCondition || 'Good',
+          returned_date: new Date().toISOString(),
           notes: notes ? (notes + ' | Return notes') : 'Asset returned',
-          is_active: false
+          status: 'returned'
         })
         .eq('asset_id', assetId)
-        .eq('is_active', true)
+        .eq('status', 'active')
 
       if (assignmentError) {
         console.error('Assignment update error:', assignmentError)
@@ -173,8 +172,7 @@ export async function PUT(request: NextRequest) {
         .update({ 
           status: 'available',
           assigned_to: null,
-          assigned_date: null,
-          return_date: new Date().toISOString().split('T')[0]
+          assigned_date: null
         })
         .eq('id', assetId)
 
