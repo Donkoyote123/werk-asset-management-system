@@ -45,13 +45,29 @@ export async function POST(request: NextRequest) {
         )
       }
 
+      // Find assignedBy user ID (assignedBy could be a name or ID)
+      let assignedByUserId = null;
+      if (typeof assignedBy === 'string' && isNaN(Number(assignedBy))) {
+        // It's a name, look up the user ID
+        const { data: assignedByUser } = await supabase
+          .from('users')
+          .select('id')
+          .eq('name', assignedBy)
+          .single()
+        
+        assignedByUserId = assignedByUser?.id || null;
+      } else {
+        // It's already an ID
+        assignedByUserId = Number(assignedBy);
+      }
+
       // Create assignment record in asset_assignments table
       const { error: assignmentError } = await supabase
         .from('asset_assignments')
         .insert({
           asset_id: assetId,
           user_id: userId,
-          assigned_by: assignedBy,
+          assigned_by: assignedByUserId,
           assigned_date: new Date().toISOString(),
           notes: notes || null,
           status: 'active'
