@@ -88,8 +88,8 @@ export async function runMigrations() {
       .single()
 
     if (!existingAdmin) {
-      const bcrypt = require('bcryptjs')
-      const adminPasswordHash = await bcrypt.hash('werk@321', 10)
+      // Use the same pre-computed hash as in userStore for consistency
+      const adminPasswordHash = "$2b$10$sQGSnA8WiIQMbHTssZeCTOKfNjVsBkqlB1y/Jxki/RFMoplr.SdP6" // werk@321
       
       const { error: insertError } = await supabase
         .from('users')
