@@ -757,6 +757,13 @@ startxref
         setShowAddAssetForm={setShowAddAssetForm}
         generateUserListPDF={generateUserListPDF}
         handleAddUser={handleAddUser}
+        handleAddAsset={handleAddAsset}
+        handleDeleteAsset={handleDeleteAsset}
+        handleAssignAssetAPI={handleAssignAssetAPI}
+        handleReturnAssetAPI={handleReturnAssetAPI}
+        handleResetPassword={handleResetPassword}
+        fetchAssets={fetchAssets}
+        fetchUsers={fetchUsers}
         generatePDFContent={generatePDFContent}
       />
     )
@@ -852,6 +859,13 @@ function Dashboard({
   setShowAddAssetForm,
   generateUserListPDF,
   handleAddUser,
+  handleAddAsset,
+  handleDeleteAsset,
+  handleAssignAssetAPI,
+  handleReturnAssetAPI,
+  handleResetPassword,
+  fetchAssets,
+  fetchUsers,
   generatePDFContent,
 }: {
   user: UserType
@@ -880,6 +894,17 @@ function Dashboard({
     role: "manager" | "staff"
     mobileNumber: string
   }) => void
+  handleAddAsset: (assetData: {
+    name: string
+    category: string
+    serialNumber: string
+  }) => Promise<boolean>
+  handleDeleteAsset: (assetId: number) => Promise<boolean>
+  handleAssignAssetAPI: (assetId: number, userId: number, notes?: string) => Promise<boolean>
+  handleReturnAssetAPI: (assetId: number, returnCondition?: string, notes?: string) => Promise<boolean>
+  handleResetPassword: (userId: number) => Promise<void>
+  fetchAssets: () => Promise<void>
+  fetchUsers: () => Promise<void>
   generatePDFContent: (content: string, filename: string) => void
 }) {
   const [activeTab, setActiveTab] = useState("dashboard")
@@ -1011,6 +1036,13 @@ function Dashboard({
             showAddUser={showAddUser}
             setShowAddUser={setShowAddUser}
             handleAddUser={handleAddUser}
+            handleAddAsset={handleAddAsset}
+            handleDeleteAsset={handleDeleteAsset}
+            handleAssignAssetAPI={handleAssignAssetAPI}
+            handleReturnAssetAPI={handleReturnAssetAPI}
+            handleResetPassword={handleResetPassword}
+            fetchAssets={fetchAssets}
+            fetchUsers={fetchUsers}
             generatePDFContent={generatePDFContent}
           />
         </main>
@@ -1045,6 +1077,13 @@ function DashboardContent({
   showAddUser,
   setShowAddUser,
   handleAddUser,
+  handleAddAsset,
+  handleDeleteAsset,
+  handleAssignAssetAPI,
+  handleReturnAssetAPI,
+  handleResetPassword,
+  fetchAssets,
+  fetchUsers,
   generatePDFContent,
 }: {
   user: UserType
@@ -1074,6 +1113,17 @@ function DashboardContent({
     role: "manager" | "staff"
     mobileNumber: string
   }) => void
+  handleAddAsset: (assetData: {
+    name: string
+    category: string
+    serialNumber: string
+  }) => Promise<boolean>
+  handleDeleteAsset: (assetId: number) => Promise<boolean>
+  handleAssignAssetAPI: (assetId: number, userId: number, notes?: string) => Promise<boolean>
+  handleReturnAssetAPI: (assetId: number, returnCondition?: string, notes?: string) => Promise<boolean>
+  handleResetPassword: (userId: number) => Promise<void>
+  fetchAssets: () => Promise<void>
+  fetchUsers: () => Promise<void>
   generatePDFContent: (content: string, filename: string) => void
 }) {
   const [searchTerm, setSearchTerm] = useState("")
