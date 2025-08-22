@@ -16,9 +16,6 @@ export async function POST(request: NextRequest) {
 
     const supabase = getSupabaseClient()
 
-    console.log('Login attempt for username:', username)
-    console.log('Supabase client available:', !!supabase)
-
     if (supabase) {
       // Try Supabase database first
       const { data: users, error } = await supabase
@@ -27,14 +24,9 @@ export async function POST(request: NextRequest) {
         .eq('username', username)
         .single()
 
-      console.log('Supabase query error:', error)
-      console.log('User found in Supabase:', !!users)
-
       if (!error && users) {
         // User found in database
-        console.log('Comparing password for user:', users.username)
         const isValidPassword = await bcrypt.compare(password, users.password_hash)
-        console.log('Password valid:', isValidPassword)
         
         if (isValidPassword) {
           const userData = {
@@ -55,13 +47,10 @@ export async function POST(request: NextRequest) {
       }
       
       // If not found in database or password incorrect, fall back to in-memory
-      console.log('Falling back to in-memory storage')
       const memoryUser = findUserByUsername(username)
-      console.log('User found in memory:', !!memoryUser)
       
       if (memoryUser) {
         const isValidPassword = await bcrypt.compare(password, memoryUser.passwordHash)
-        console.log('Memory user password valid:', isValidPassword)
         
         if (isValidPassword) {
           const { passwordHash, ...userWithoutPassword } = memoryUser
@@ -73,13 +62,10 @@ export async function POST(request: NextRequest) {
       }
     } else {
       // Use in-memory storage fallback
-      console.log('Using in-memory storage fallback')
       const user = findUserByUsername(username)
-      console.log('User found in memory (fallback):', !!user)
       
       if (user) {
         const isValidPassword = await bcrypt.compare(password, user.passwordHash)
-        console.log('Memory user password valid (fallback):', isValidPassword)
         
         if (isValidPassword) {
           const { passwordHash, ...userWithoutPassword } = user

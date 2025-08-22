@@ -1,32 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-
-// Database connection - works both locally and on Vercel
-let sql: any;
-
-async function getDatabase() {
-  if (!sql) {
-    try {
-      // Try Vercel Postgres first (production)
-      const { sql: vercelSql } = await import('@vercel/postgres');
-      
-      // Check if we have a connection string
-      if (process.env.POSTGRES_URL || process.env.DATABASE_URL) {
-        sql = vercelSql;
-      } else {
-        sql = null;
-      }
-    } catch (error) {
-      console.log('Using in-memory fallback for development');
-      sql = null;
-    }
-  }
-  return sql;
-}
+import { getSupabaseClient } from '@/lib/database'
 
 // POST - Assign asset to user
 export async function POST(request: NextRequest) {
   try {
-    const database = await getDatabase();
     const { assetId, userId, assignedBy, notes } = await request.json();
     
     if (!assetId || !userId || !assignedBy) {
@@ -36,15 +13,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (database) {
-      // Use database (production)
+    const supabase = getSupabaseClient()
+    
+    if (supabase) {
       // Check if asset exists and is available
-      const assetCheck = await database`
-        SELECT id, name, status FROM assets 
-        WHERE id = ${assetId} AND status = 'available'
-      `;
+      const { data: asset, error: assetError } = await supabase
+        .from('assets')
+        .select('id, name, status')
+        .eq('id', assetId)
+        .eq('status', 'available')
+        .single()
 
-      if (assetCheck.rows.length === 0) {
+      if (assetError || !asset) {
         return NextResponse.json(
           { error: 'Asset not found or not available for assignment' },
           { status: 404 }
@@ -52,41 +32,79 @@ export async function POST(request: NextRequest) {
       }
 
       // Get user name
-      const userCheck = await database`
-        SELECT name FROM users WHERE id = ${userId}
-      `;
+      const { data: user, error: userError } = await supabase
+        .from('users')
+        .select('id, name')
+        .eq('id', userId)
+        .single()
 
-      if (userCheck.rows.length === 0) {
+      if (userError || !user) {
         return NextResponse.json(
           { error: 'User not found' },
           { status: 404 }
         )
       }
 
-      const userName = userCheck.rows[0].name;
+      // Create assignment record in asset_assignments table
+      const { error: assignmentError } = await supabase
+        .from('asset_assignments')
+        .insert({
+          asset_id: assetId,
+          user_id: userId,
+          assigned_by: assignedBy,
+          date_assigned: new Date().toISOString().split('T')[0],
+          notes: notes || null,
+          is_active: true
+        })
 
-      // Create assignment record
-      await database`
-        INSERT INTO asset_assignments (asset_id, user_id, assigned_by, date_assigned, notes, is_active)
-        VALUES (${assetId}, ${userId}, ${assignedBy}, CURRENT_DATE, ${notes || null}, true)
-      `;
+      if (assignmentError) {
+        console.error('Assignment error:', assignmentError)
+        return NextResponse.json(
+          { error: 'Failed to create assignment record' },
+          { status: 500 }
+        )
+      }
 
       // Update asset status
-      await database`
-        UPDATE assets 
-        SET status = 'assigned', assigned_to = ${userName}, assigned_date = CURRENT_DATE
-        WHERE id = ${assetId}
-      `;
+      const { error: updateError } = await supabase
+        .from('assets')
+        .update({ 
+          status: 'assigned',
+          assigned_to: user.name,
+          assigned_date: new Date().toISOString().split('T')[0]
+        })
+        .eq('id', assetId)
+
+      if (updateError) {
+        console.error('Asset update error:', updateError)
+        return NextResponse.json(
+          { error: 'Failed to update asset status' },
+          { status: 500 }
+        )
+      }
 
       return NextResponse.json({
-        message: 'Asset assigned successfully'
+        message: 'Asset assigned successfully',
+        assignment: {
+          assetId,
+          assetName: asset.name,
+          userId,
+          userName: user.name,
+          assignedBy,
+          assignedDate: new Date().toISOString().split('T')[0]
+        }
       });
 
     } else {
-      // In-memory fallback would need assets and users arrays
-      // For now, return success for development
+      // In-memory fallback for development
       return NextResponse.json({
-        message: 'Asset assignment simulated (development mode)'
+        message: 'Asset assignment simulated (development mode - no database)',
+        assignment: {
+          assetId,
+          userId,
+          assignedBy,
+          assignedDate: new Date().toISOString().split('T')[0]
+        }
       });
     }
 
@@ -102,7 +120,6 @@ export async function POST(request: NextRequest) {
 // PUT - Return asset
 export async function PUT(request: NextRequest) {
   try {
-    const database = await getDatabase();
     const { assetId, returnCondition, notes } = await request.json();
     
     if (!assetId) {
@@ -112,45 +129,83 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    if (database) {
-      // Use database (production)
+    const supabase = getSupabaseClient()
+    
+    if (supabase) {
       // Check if asset is assigned
-      const assetCheck = await database`
-        SELECT id, name, status FROM assets 
-        WHERE id = ${assetId} AND status = 'assigned'
-      `;
+      const { data: asset, error: assetError } = await supabase
+        .from('assets')
+        .select('id, name, status, assigned_to')
+        .eq('id', assetId)
+        .eq('status', 'assigned')
+        .single()
 
-      if (assetCheck.rows.length === 0) {
+      if (assetError || !asset) {
         return NextResponse.json(
           { error: 'Asset not found or not currently assigned' },
           { status: 404 }
         )
       }
 
-      // Update assignment record
-      await database`
-        UPDATE asset_assignments 
-        SET date_returned = CURRENT_DATE, return_condition = ${returnCondition || null}, 
-            notes = COALESCE(notes, '') || ${notes ? '; Return: ' + notes : ''},
-            is_active = false
-        WHERE asset_id = ${assetId} AND is_active = true
-      `;
+      // Update assignment record to mark as returned
+      const { error: assignmentError } = await supabase
+        .from('asset_assignments')
+        .update({
+          date_returned: new Date().toISOString().split('T')[0],
+          return_condition: returnCondition || 'Good',
+          notes: notes ? (notes + ' | Return notes') : 'Asset returned',
+          is_active: false
+        })
+        .eq('asset_id', assetId)
+        .eq('is_active', true)
 
-      // Update asset status
-      await database`
-        UPDATE assets 
-        SET status = 'available', assigned_to = NULL, assigned_date = NULL, return_date = CURRENT_DATE
-        WHERE id = ${assetId}
-      `;
+      if (assignmentError) {
+        console.error('Assignment update error:', assignmentError)
+        return NextResponse.json(
+          { error: 'Failed to update assignment record' },
+          { status: 500 }
+        )
+      }
+
+      // Update asset status to available
+      const { error: updateError } = await supabase
+        .from('assets')
+        .update({ 
+          status: 'available',
+          assigned_to: null,
+          assigned_date: null,
+          return_date: new Date().toISOString().split('T')[0]
+        })
+        .eq('id', assetId)
+
+      if (updateError) {
+        console.error('Asset update error:', updateError)
+        return NextResponse.json(
+          { error: 'Failed to update asset status' },
+          { status: 500 }
+        )
+      }
 
       return NextResponse.json({
-        message: 'Asset returned successfully'
+        message: 'Asset returned successfully',
+        return: {
+          assetId,
+          assetName: asset.name,
+          returnedBy: asset.assigned_to,
+          returnDate: new Date().toISOString().split('T')[0],
+          returnCondition: returnCondition || 'Good'
+        }
       });
 
     } else {
-      // In-memory fallback
+      // In-memory fallback for development
       return NextResponse.json({
-        message: 'Asset return simulated (development mode)'
+        message: 'Asset return simulated (development mode - no database)',
+        return: {
+          assetId,
+          returnDate: new Date().toISOString().split('T')[0],
+          returnCondition: returnCondition || 'Good'
+        }
       });
     }
 

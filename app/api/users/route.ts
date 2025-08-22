@@ -192,6 +192,38 @@ export async function PUT(request: NextRequest) {
       )
     }
 
+    // Generate new password and hash it
+    const newPassword = generateSecurePassword();
+    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+
+    const supabase = getSupabaseClient()
+    
+    if (supabase) {
+      // Try to update in Supabase first
+      const { data: dbUser, error: updateError } = await supabase
+        .from('users')
+        .update({ password_hash: newPasswordHash })
+        .eq('id', userId)
+        .select('id, username, name')
+        .single()
+
+      if (!updateError && dbUser) {
+        // Successfully updated in database
+        return NextResponse.json({
+          message: 'Password reset successfully',
+          newPassword: newPassword,
+          user: {
+            id: dbUser.id,
+            username: dbUser.username,
+            name: dbUser.name
+          }
+        });
+      } else {
+        console.error('Error updating password in Supabase:', updateError)
+      }
+    }
+
+    // Fallback to in-memory user update
     const users = getAllUsers();
     const userIndex = users.findIndex(u => u.id === userId);
     
@@ -202,16 +234,17 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    // Generate new password and hash it
-    const newPassword = generateSecurePassword();
-    const newPasswordHash = await bcrypt.hash(newPassword, 10);
-    
     // Update user's password (modify the original array)
     users[userIndex].passwordHash = newPasswordHash;
 
     return NextResponse.json({
       message: 'Password reset successfully',
-      newPassword: newPassword
+      newPassword: newPassword,
+      user: {
+        id: users[userIndex].id,
+        username: users[userIndex].username,
+        name: users[userIndex].name
+      }
     });
   } catch (error) {
     console.error('Error resetting password:', error)
