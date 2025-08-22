@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseClient } from '@/lib/database'
 
-export async function POST() {
+export async function GET() {
   try {
     const supabase = getSupabaseClient()
     
