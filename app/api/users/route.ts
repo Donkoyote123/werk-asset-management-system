@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
+import { getSupabaseClient } from '@/lib/database'
 import { 
   getAllUsers, 
   addUser, 
@@ -21,17 +22,47 @@ interface NewUserData {
 // GET - Fetch all users
 export async function GET(request: NextRequest) {
   try {
-    // Use shared user store for development
+    const supabase = getSupabaseClient()
+    
+    if (supabase) {
+      // Try Supabase first
+      const { data: usersFromDb, error } = await supabase
+        .from('users')
+        .select('id, username, name, email, role, id_number, mobile_number, created_date, is_active')
+        .eq('is_active', true)
+        .order('created_date', { ascending: false })
+
+      if (!error && usersFromDb) {
+        // Transform database format to match frontend expectations
+        const transformedUsers = usersFromDb.map((user: any) => ({
+          id: user.id,
+          username: user.username,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          idNumber: user.id_number,
+          mobileNumber: user.mobile_number,
+          createdDate: user.created_date,
+          isActive: user.is_active
+        }))
+
+        return NextResponse.json(transformedUsers)
+      }
+    }
+    
+    // Fallback to in-memory storage
     const users = getAllUsers();
     const safeUsers = users.map(({ passwordHash, ...user }) => user);
     
     return NextResponse.json(safeUsers);
   } catch (error) {
     console.error('Error fetching users:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    
+    // Fallback to in-memory storage on error
+    const users = getAllUsers();
+    const safeUsers = users.map(({ passwordHash, ...user }) => user);
+    
+    return NextResponse.json(safeUsers);
   }
 }
 
@@ -79,7 +110,54 @@ export async function POST(request: NextRequest) {
       isActive: true,
     };
 
-    // Add to shared store
+    const supabase = getSupabaseClient()
+    
+    if (supabase) {
+      // Try to save to Supabase first
+      const { data: dbUser, error: insertError } = await supabase
+        .from('users')
+        .insert({
+          username: newUser.username,
+          password_hash: newUser.passwordHash,
+          name: newUser.name,
+          email: newUser.email,
+          role: newUser.role,
+          id_number: newUser.idNumber,
+          mobile_number: newUser.mobileNumber,
+          is_active: newUser.isActive
+        })
+        .select()
+        .single()
+
+      if (!insertError && dbUser) {
+        // Successfully saved to database
+        const { password_hash, ...safeUser } = dbUser
+        const transformedUser = {
+          id: dbUser.id,
+          username: dbUser.username,
+          name: dbUser.name,
+          email: dbUser.email,
+          role: dbUser.role,
+          idNumber: dbUser.id_number,
+          mobileNumber: dbUser.mobile_number,
+          createdDate: dbUser.created_date,
+          isActive: dbUser.is_active
+        }
+        
+        return NextResponse.json({
+          message: 'User created successfully',
+          user: transformedUser,
+          credentials: {
+            username: username,
+            password: plainPassword
+          }
+        });
+      } else {
+        console.error('Error saving to Supabase:', insertError)
+      }
+    }
+
+    // Fallback to in-memory storage
     addUser(newUser);
 
     // Return success with credentials
