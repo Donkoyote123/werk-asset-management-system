@@ -157,6 +157,13 @@ type Document = {
   listType?: string
   userId?: number
   userName?: string
+  assetId?: number
+  assetName?: string
+  staffName?: string
+  assignmentDate?: string
+  returnDate?: string
+  condition?: string
+  returnCondition?: string
   timestamp: string
   content: string
 }
@@ -2253,7 +2260,7 @@ System developed by Don Kelvin | 0759954921`
                         </div>
                         <div>
                           <label className="text-sm font-medium text-gray-700">Registration Date</label>
-                          <p className="mt-1 text-sm text-gray-900">{user.registrationDate}</p>
+                          <p className="mt-1 text-sm text-gray-900">{user.createdDate}</p>
                         </div>
                         <div>
                           <label className="text-sm font-medium text-gray-700">Account Status</label>
