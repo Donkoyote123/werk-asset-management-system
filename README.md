@@ -1,27 +1,28 @@
 # WERK Asset Management System
 
-A modern web application for managing organizational assets built with Next.js.
+A modern web application for managing organizational assets built with Next.js and TypeScript.
 
 ## Features
 
-- User Management (Admin, Manager, Staff roles)
-- Asset Tracking and Assignment
-- Document Generation and Reports
-- Responsive Design
-- Secure Authentication
+- **User Management**: Admin, Manager, and Staff role-based access control
+- **Asset Tracking**: Complete asset lifecycle management with assignment tracking
+- **Document Generation**: PDF reports and user credential receipts
+- **Responsive Design**: Mobile-friendly interface
+- **Secure Authentication**: Encrypted password storage and session management
+- **Database Integration**: Supabase PostgreSQL backend with fallback support
 
 ## Getting Started
 
 ### Prerequisites
 
 - Node.js 18.x or later
-- npm
+- npm or pnpm
 
 ### Installation
 
 1. Clone the repository
 ```bash
-git clone https://github.com/Donkoyote123/werk-asset-management-system.git
+git clone <repository-url>
 cd werk-asset-management-system
 ```
 
@@ -30,49 +31,43 @@ cd werk-asset-management-system
 npm install
 ```
 
-3. Start the development server
+3. Set up environment variables
+```bash
+cp .env.example .env.local
+# Add your Supabase credentials to .env.local
+```
+
+4. Start the development server
 ```bash
 npm run dev
 ```
 
-4. Open [http://localhost:3000](http://localhost:3000) in your browser
+5. Open [http://localhost:3000](http://localhost:3000) in your browser
 
-### Default Login
+### Default Admin Login
 
 - **Username**: Admin.Asset@werk
 - **Password**: werk@321
 
-## Deployment
+## Database Setup
 
-This application is ready to deploy on Vercel:
+This application supports Supabase PostgreSQL. Run the SQL scripts in the `database/` directory to set up your tables:
 
-1. Push your code to GitHub
-2. Connect your repository to Vercel
-3. Deploy automatically
-
-For production, consider adding a database like Vercel Postgres for persistent data storage.
+- `init.sql` - Creates tables and initial data
 
 ## Technologies Used
 
 - **Frontend**: Next.js 15, React 19, TypeScript
 - **Styling**: Tailwind CSS
-- **UI Components**: Radix UI
-- **Authentication**: Custom API routes with bcrypt
+- **UI Components**: Radix UI (shadcn/ui)
+- **Database**: Supabase PostgreSQL
+- **Authentication**: Custom API routes with bcryptjs
 - **Icons**: Lucide React
 
-## Project Structure
+## Deployment
 
-```
-├── app/                    # Next.js app directory
-│   ├── api/               # API routes
-│   ├── globals.css        # Global styles
-│   ├── layout.tsx         # Root layout
-│   └── page.tsx           # Main application
-├── components/            # Reusable UI components
-├── lib/                   # Utility functions
-└── public/                # Static assets
-```
+Ready for deployment on Vercel with automatic CI/CD from GitHub.
 
 ## License
 
-This project is for internal use by Women Educational Researchers of Kenya (WERK).
+© 2025 Women Educational Researchers of Kenya (WERK). All rights reserved.
